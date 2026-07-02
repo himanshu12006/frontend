@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-cream: #FDFBF7;
+  --color-brand-cream-dark: #F5EFEB;
+  --color-brand-beige: #EFE8E1;
+  --color-brand-gold: #C5A880;
+  --color-brand-gold-dark: #A98E65;
+  --color-brand-charcoal: #1A1A1A;
+  --color-brand-charcoal-light: #2A2A2A;
+  --color-brand-offwhite: #FAF9F6;
+  --color-brand-gray: #F3F4F6;
+  
+  --color-brand-forest: #253B32;
+  --color-brand-forest-light: #3D5A4E;
+  --color-brand-sage: #D2DCD6;
+  --color-brand-sage-dark: #8FA89B;
+  
+  --font-serif: "Playfair Display", "Didot", "Georgia", serif;
+  --font-sans: "Outfit", "Inter", "Segoe UI", sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  background-color: var(--color-brand-offwhite);
+  color: var(--color-brand-charcoal);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #FAF9F6; /* brand-offwhite */
+}
+
+/* Custom Scrollbar for premium aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF9F6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #EFE8E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C5A880;
+}
+
+/* Custom typography settings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
+/* Navigation link hover styles */
+.nav-link {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 1px;
+  bottom: -4px;
+  left: 0;
+  background-color: #C5A880; /* gold */
+  transform-origin: bottom right;
+  transition: transform 0.25s ease-out;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* Grid overlay hover animations */
+.group:hover .scale-hover {
+  transform: scale(1.05);
+}
+
+.scale-hover {
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
