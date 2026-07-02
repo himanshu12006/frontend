@@ -5,7 +5,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api', // backend base URL
+  baseURL: 'https://backend-0cpd.onrender.com', // backend base URL
   withCredentials: true,                // sends/receives HttpOnly cookies containing JWT
   headers: {
     'Content-Type': 'application/json',
