@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, CheckCircle, Mail, Lock, User, Key } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../firebase';
 
 export default function Auth() {
-  const { user, login, register, forgotPassword, logout, error, setError } = useAuth();
+  const { user, login, register, loginWithGoogle, forgotPassword, logout, error, setError } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -50,16 +52,34 @@ export default function Auth() {
     }
   };
 
-  const handleSocialLogin = (platform) => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSuccessMsg(`Simulated ${platform} Auth successful! Redirecting...`);
-      login('guest.user@example.com', 'social-secret-pass');
+    setSuccessMsg('');
+    setError(null);
+    try {
+      // 1. Open Firebase Google sign in popup
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      // 2. Fetch Firebase ID token
+      const idToken = await result.user.getIdToken();
+      
+      // 3. Send token to backend via AuthContext
+      await loginWithGoogle(idToken);
+      
+      setSuccessMsg('Authenticated with Google successfully! Redirecting...');
       setTimeout(() => {
         navigate('/');
       }, 1500);
-    }, 1000);
+    } catch (err) {
+      console.error('Google Auth Error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google Sign-In window closed. Please try again.');
+      } else {
+        setError(err.message || 'Failed to authenticate via Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -210,32 +230,42 @@ export default function Auth() {
               </button>
             </form>
 
-            {/* Social Logins Section */}
+            {/* Google Sign In Section */}
             {authMode !== 'forgot' && (
               <div className="space-y-4 pt-4 border-t border-brand-beige">
-                <div className="text-center text-[10px] text-brand-charcoal-light/50 uppercase tracking-widest font-semibold">
-                  Or Connect With
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute inset-x-0 border-t border-brand-beige"></div>
+                  <span className="relative bg-brand-cream px-3 text-[10px] text-brand-charcoal-light/50 uppercase tracking-widest font-semibold">
+                    Or Continue With
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleSocialLogin('Google')}
-                    className="py-2.5 px-4 border border-brand-beige hover:border-brand-gold bg-brand-cream-dark flex items-center justify-center gap-2 hover:shadow-xs transition-all text-xs font-semibold uppercase tracking-wider text-brand-charcoal"
-                  >
-                    <svg className="w-4 h-4 fill-current text-brand-gold" viewBox="0 0 24 24">
-                      <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.579-7.859-8s3.529-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.986 0-.745-.08-1.3-.176-1.859H12.24z" />
-                    </svg>
-                    <span>Google</span>
-                  </button>
-                  <button
-                    onClick={() => handleSocialLogin('Facebook')}
-                    className="py-2.5 px-4 border border-brand-beige hover:border-brand-gold bg-brand-cream-dark flex items-center justify-center gap-2 hover:shadow-xs transition-all text-xs font-semibold uppercase tracking-wider text-brand-charcoal"
-                  >
-                    <svg className="w-4 h-4 fill-current text-blue-600" viewBox="0 0 24 24">
-                      <path d="M9 8H7v3h2v9h3v-9h3.6l.4-3H12V6c0-.9.2-1.2 1-1.2h2V2h-3c-3 0-5 1.4-5 4v2z" />
-                    </svg>
-                    <span>Facebook</span>
-                  </button>
-                </div>
+                
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full py-3 px-4 border border-brand-beige hover:border-brand-gold bg-brand-cream-dark flex items-center justify-center gap-3 hover:shadow-xs transition-all text-xs font-semibold uppercase tracking-wider text-brand-charcoal rounded-sm cursor-pointer disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#EA4335"
+                      d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3.01A11.91 11.91 0 0 0 12 .909c-4.664 0-8.664 2.664-10.664 6.555z"
+                    />
+                    <path
+                      fill="#4285F4"
+                      d="M23.473 12.273c0-.818-.073-1.609-.209-2.373H12v4.5h6.436a5.5 5.5 0 0 1-2.39 3.609l3.864 3c2.259-2.082 3.564-5.145 3.564-8.736z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M1.336 7.464l3.93 3.055A7.025 7.025 0 0 1 12 19.091c-2.345 0-4.391-1.427-5.136-3.482L1.336 7.464z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 19.091a7.07 7.07 0 0 1-5.136-2.373l-3.864 3A11.947 11.947 0 0 0 12 23.091c3.245 0 5.973-1.073 7.964-2.909l-3.864-3c-1.127.755-2.564 1.2-4.1 1.2z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </button>
               </div>
             )}
 

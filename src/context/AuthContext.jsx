@@ -63,6 +63,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (idToken) => {
+    setError(null);
+    try {
+      const { data } = await API.post('/auth/google', { idToken });
+      if (data && data.success) {
+        setUser(data.data);
+        localStorage.setItem('om_user', JSON.stringify(data.data));
+        return data.data;
+      }
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Google login failed. Please try again.';
+      setError(errMsg);
+      throw new Error(errMsg);
+    }
+  };
+
   const forgotPassword = async (email) => {
     setError(null);
     try {
@@ -87,7 +103,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, error, loading, login, register, forgotPassword, logout, setError }}>
+    <AuthContext.Provider value={{ user, error, loading, login, register, loginWithGoogle, forgotPassword, logout, setError }}>
       {children}
     </AuthContext.Provider>
   );
