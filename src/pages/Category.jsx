@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { SlidersHorizontal, ArrowDownAZ, Heart, Grid, List, Search } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import QuickViewModal from '../components/QuickViewModal';
@@ -9,6 +9,7 @@ import API from '../api/axiosInstance';
 
 export default function Category() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { wishlist } = useWishlist();
 
   const [productsList, setProductsList] = useState(products); // Fallback to mock products
@@ -16,28 +17,36 @@ export default function Category() {
   const [sortBy, setSortBy] = useState('default');
   const [loading, setLoading] = useState(true);
 
-  // ── FIX: Read URL params SYNCHRONOUSLY in useState initializers ──────────────
-  // On hard refresh, location.search is available immediately on first render.
-  // Using lazy initializers means selectedCategory/Tag/searchTerm are already
-  // correct BEFORE any useEffect fires, eliminating the race condition where
-  // the API response arrives after filtering ran against stale state.
-  const [selectedCategory, setSelectedCategory] = useState(() => {
-    const p = new URLSearchParams(location.search);
-    return p.get('category') || 'All';
-  });
-  const [selectedTag, setSelectedTag] = useState(() => {
-    const p = new URLSearchParams(location.search);
-    const f = p.get('filter');
+  // Extract query parameters from URL
+  const queryParams = useMemo(() => {
+    return new URLSearchParams(location.search);
+  }, [location.search]);
+
+  // ── SINGLE SOURCE OF TRUTH: Read filters directly from query parameters ────
+  const selectedCategory = useMemo(() => {
+    return queryParams.get('category') || 'All';
+  }, [queryParams]);
+
+  const selectedTag = useMemo(() => {
+    const f = queryParams.get('filter');
     if (f === 'new') return 'New';
     if (f === 'bestseller') return 'Bestseller';
     if (f === 'trending') return 'Trending';
     if (f === 'wishlist') return 'Wishlist';
     return 'All';
-  });
-  const [searchTerm, setSearchTerm] = useState(() => {
-    const p = new URLSearchParams(location.search);
-    return p.get('search') || '';
-  });
+  }, [queryParams]);
+
+  const searchTerm = useMemo(() => {
+    return queryParams.get('search') || '';
+  }, [queryParams]);
+
+  // Keep a local search input state for smooth typing
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+
+  // Sync local search input if search param changes (e.g., cleared filters)
+  useEffect(() => {
+    setLocalSearch(searchTerm);
+  }, [searchTerm]);
 
   // Load real products from the database on mount
   useEffect(() => {
@@ -57,31 +66,45 @@ export default function Category() {
     fetchRealProducts();
   }, []);
 
-  // Extract query parameters from URL
-  const queryParams = useMemo(() => {
-    return new URLSearchParams(location.search);
-  }, [location.search]);
+  // ── URL Sync Handlers ──────────────────────────────────────────────────────
+  const handleCategoryClick = (cat) => {
+    const params = new URLSearchParams(location.search);
+    if (cat === 'All') {
+      params.delete('category');
+    } else {
+      params.set('category', cat);
+    }
+    navigate(`/shop?${params.toString()}`);
+  };
 
-  // ── Sync URL params on subsequent navigations (NOT initial mount) ────────────
-  // This handles cases where the user navigates from /shop?category=Men to
-  // /shop?category=Women via a link click — the URL changes but component
-  // stays mounted, so we sync the new params into state.
-  useEffect(() => {
-    const catParam = queryParams.get('category');
-    setSelectedCategory(catParam || 'All');
+  const handleTagClick = (tagVal) => {
+    const params = new URLSearchParams(location.search);
+    if (tagVal === 'All') {
+      params.delete('filter');
+    } else {
+      params.set('filter', tagVal.toLowerCase());
+    }
+    navigate(`/shop?${params.toString()}`);
+  };
 
-    const filterParam = queryParams.get('filter');
-    if (filterParam === 'new') setSelectedTag('New');
-    else if (filterParam === 'bestseller') setSelectedTag('Bestseller');
-    else if (filterParam === 'trending') setSelectedTag('Trending');
-    else if (filterParam === 'wishlist') setSelectedTag('Wishlist');
-    else setSelectedTag('All');
+  const handleSearchChange = (val) => {
+    setLocalSearch(val);
+    const params = new URLSearchParams(location.search);
+    if (val.trim() === '') {
+      params.delete('search');
+    } else {
+      params.set('search', val.trim());
+    }
+    navigate(`/shop?${params.toString()}`, { replace: true });
+  };
 
-    const searchParam = queryParams.get('search');
-    setSearchTerm(searchParam || '');
-  }, [queryParams]);
+  const handleClearAll = () => {
+    setLocalSearch('');
+    setSortBy('default');
+    navigate('/shop');
+  };
 
-  // Filter products based on state
+  // Filter products based on active params
   const filteredProducts = useMemo(() => {
     let result = [...productsList];
 
@@ -134,13 +157,6 @@ export default function Category() {
     { label: 'My Favorites', value: 'Wishlist' },
   ];
 
-  const handleClearAll = () => {
-    setSelectedCategory('All');
-    setSelectedTag('All');
-    setSearchTerm('');
-    setSortBy('default');
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 bg-brand-offwhite min-h-[70vh]">
       {/* Page Header */}
@@ -170,8 +186,8 @@ export default function Category() {
               <input
                 type="text"
                 placeholder="Type details (e.g. linen)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={localSearch}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full text-xs bg-transparent outline-none pr-6 text-brand-charcoal"
               />
               <Search className="w-4 h-4 text-brand-charcoal-light/50 absolute right-3" />
@@ -185,7 +201,7 @@ export default function Category() {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => handleCategoryClick(cat)}
                   className={`text-left text-xs uppercase tracking-wider py-1.5 px-2 rounded-xs transition-colors flex justify-between items-center ${
                     selectedCategory === cat
                       ? 'bg-brand-beige text-brand-charcoal font-semibold border-l-2 border-brand-gold'
@@ -210,7 +226,7 @@ export default function Category() {
               {tags.map((tg) => (
                 <button
                   key={tg.value}
-                  onClick={() => setSelectedTag(tg.value)}
+                  onClick={() => handleTagClick(tg.value)}
                   className={`text-left text-xs uppercase tracking-wider py-1.5 px-2 rounded-xs transition-colors flex justify-between items-center ${
                     selectedTag === tg.value
                       ? 'bg-brand-beige text-brand-charcoal font-semibold border-l-2 border-brand-gold'
