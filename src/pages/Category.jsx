@@ -14,9 +14,30 @@ export default function Category() {
   const [productsList, setProductsList] = useState(products); // Fallback to mock products
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [sortBy, setSortBy] = useState('default');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedTag, setSelectedTag] = useState('All');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // ── FIX: Read URL params SYNCHRONOUSLY in useState initializers ──────────────
+  // On hard refresh, location.search is available immediately on first render.
+  // Using lazy initializers means selectedCategory/Tag/searchTerm are already
+  // correct BEFORE any useEffect fires, eliminating the race condition where
+  // the API response arrives after filtering ran against stale state.
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get('category') || 'All';
+  });
+  const [selectedTag, setSelectedTag] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    const f = p.get('filter');
+    if (f === 'new') return 'New';
+    if (f === 'bestseller') return 'Bestseller';
+    if (f === 'trending') return 'Trending';
+    if (f === 'wishlist') return 'Wishlist';
+    return 'All';
+  });
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get('search') || '';
+  });
 
   // Load real products from the database on mount
   useEffect(() => {
@@ -29,6 +50,8 @@ export default function Category() {
       } catch (err) {
         // Backend not running or no products yet — silently fall back to mock data
         console.warn('Could not load products from API. Using mock fallback.', err?.message);
+      } finally {
+        setLoading(false);
       }
     };
     fetchRealProducts();
@@ -39,34 +62,23 @@ export default function Category() {
     return new URLSearchParams(location.search);
   }, [location.search]);
 
+  // ── Sync URL params on subsequent navigations (NOT initial mount) ────────────
+  // This handles cases where the user navigates from /shop?category=Men to
+  // /shop?category=Women via a link click — the URL changes but component
+  // stays mounted, so we sync the new params into state.
   useEffect(() => {
-    // Sync category from URL parameter
     const catParam = queryParams.get('category');
-    if (catParam) {
-      setSelectedCategory(catParam);
-    } else {
-      setSelectedCategory('All');
-    }
+    setSelectedCategory(catParam || 'All');
 
-    // Sync filters from URL parameter
     const filterParam = queryParams.get('filter');
-    if (filterParam) {
-      if (filterParam === 'new') setSelectedTag('New');
-      else if (filterParam === 'bestseller') setSelectedTag('Bestseller');
-      else if (filterParam === 'trending') setSelectedTag('Trending');
-      else if (filterParam === 'wishlist') setSelectedTag('Wishlist');
-      else setSelectedTag('All');
-    } else {
-      setSelectedTag('All');
-    }
+    if (filterParam === 'new') setSelectedTag('New');
+    else if (filterParam === 'bestseller') setSelectedTag('Bestseller');
+    else if (filterParam === 'trending') setSelectedTag('Trending');
+    else if (filterParam === 'wishlist') setSelectedTag('Wishlist');
+    else setSelectedTag('All');
 
-    // Sync search from URL parameter
     const searchParam = queryParams.get('search');
-    if (searchParam) {
-      setSearchTerm(searchParam);
-    } else {
-      setSearchTerm('');
-    }
+    setSearchTerm(searchParam || '');
   }, [queryParams]);
 
   // Filter products based on state
@@ -182,9 +194,9 @@ export default function Category() {
                 >
                   <span>{cat === 'All' ? 'All Collections' : cat}</span>
                   <span className="text-[10px] text-brand-charcoal-light/50">
-                    ({cat === 'All' 
-                      ? products.length 
-                      : products.filter((p) => p.category === cat).length})
+                    ({cat === 'All'
+                      ? productsList.length
+                      : productsList.filter((p) => p.category === cat).length})
                   </span>
                 </button>
               ))}
@@ -210,14 +222,14 @@ export default function Category() {
                     {tg.label}
                   </span>
                   <span className="text-[10px] text-brand-charcoal-light/50">
-                    ({tg.value === 'All' 
-                      ? products.length 
+                    ({tg.value === 'All'
+                      ? productsList.length
                       : tg.value === 'New'
-                        ? products.filter((p) => p.isNew).length
+                        ? productsList.filter((p) => p.isNew).length
                         : tg.value === 'Bestseller'
-                          ? products.filter((p) => p.isBestSeller).length
+                          ? productsList.filter((p) => p.isBestSeller).length
                           : tg.value === 'Trending'
-                            ? products.filter((p) => p.isTrending).length
+                            ? productsList.filter((p) => p.isTrending).length
                             : wishlist.length})
                   </span>
                 </button>
@@ -260,11 +272,24 @@ export default function Category() {
           </div>
 
           {/* Products Grid */}
-          {filteredProducts.length > 0 ? (
+          {loading ? (
+            // Loading skeleton — prevents flashing "No Products Found" before API responds
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-brand-cream border border-brand-beige rounded-sm animate-pulse">
+                  <div className="h-64 bg-brand-beige/40" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-3 bg-brand-beige/60 rounded w-3/4" />
+                    <div className="h-3 bg-brand-beige/40 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {filteredProducts.map((product) => (
                 <ProductCard
-                  key={product.id}
+                  key={product._id || product.id}
                   product={product}
                   onQuickView={(p) => setSelectedProduct(p)}
                 />
